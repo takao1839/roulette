@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>サウナルーレット (割合調整版)</title>
+    <title>サウナルーレット</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -16,7 +16,7 @@
 </head>
 <body class="p-4 md:p-8">
 
-    <div class="max-w-5xl mx-auto">
+    <div class="max-w-4xl mx-auto">
         <header class="text-center mb-8">
             <h1 class="text-3xl font-bold text-blue-600 mb-2">🧖‍♂️ サウナルーレット 🧖‍♀️</h1>
             <div id="status" class="inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-gray-200 text-gray-500 uppercase">Connecting...</div>
@@ -37,10 +37,10 @@
 
                 <div>
                     <div class="flex justify-between items-end mb-4">
-                        <h2 class="text-lg font-bold text-blue-900 italic">📊 候補リスト (回す前に割合を調整！)</h2>
+                        <h2 class="text-lg font-bold text-blue-900 italic">📊 候補リスト</h2>
                         <button onclick="resetAll()" class="text-[10px] text-red-300 hover:text-red-500 font-bold uppercase">All Reset</button>
                     </div>
-                    <ul id="locationList" class="space-y-2 max-h-96 overflow-y-auto">
+                    <ul id="locationList" class="space-y-2 max-h-80 overflow-y-auto">
                         </ul>
                 </div>
             </div>
@@ -90,11 +90,7 @@
             items = [];
             if (data) {
                 Object.keys(data).forEach(key => {
-                    items.push({ 
-                        id: key, 
-                        weight: data[key].weight !== undefined ? data[key].weight : 1, // 割合の初期値は1
-                        ...data[key] 
-                    });
+                    items.push({ id: key, ...data[key] });
                 });
             }
             document.getElementById('status').innerText = "✅ ONLINE";
@@ -112,24 +108,23 @@
             saunaRef.push({
                 user_name: user,
                 location_name: loc,
-                win_count: 0,
-                weight: 1 // デフォルトの割合数値を1に設定
+                win_count: 0
             });
             document.getElementById('locName').value = '';
         }
 
-        // 3. 項目の削除
+        // 3. 項目の削除（バグ修正済み）
         function removeItem(id) {
             if (confirm('この項目をリストから消しますか？')) {
-                saunaRef.child(id).remove();
+                saunaRef.child(id).remove()
+                    .then(() => {
+                        console.log("削除成功");
+                    })
+                    .catch((error) => {
+                        console.error("削除エラー:", error);
+                        alert("削除に失敗しました: " + error.message);
+                    });
             }
-        }
-
-        // 割合（数値）が変わった時にFirebaseを更新する関数
-        function updateWeight(id, value) {
-            let num = parseInt(value, 10);
-            if (isNaN(num) || num < 1) num = 1; // 1未満の不正な値は1にする
-            saunaRef.child(id).update({ weight: num });
         }
 
         // 4. 当選回数の更新
@@ -148,4 +143,66 @@
                 list.innerHTML = "<li class='text-gray-400 italic text-sm py-4'>候補がありません</li>";
                 return;
             }
-            list.innerHTML = items.map(item =>
+            list.innerHTML = items.map(item => `
+                <li class="flex justify-between items-center p-3 bg-blue-50 rounded-2xl border-2 ${item.win_count >= 3 ? 'border-yellow-400 bg-yellow-50' : 'border-white'}">
+                    <div class="flex-1">
+                        <div class="text-sm font-bold text-gray-800">${item.location_name}</div>
+                        <div class="text-[10px] text-blue-400 font-bold">By ${item.user_name}</div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="text-blue-500 font-mono text-lg tracking-tighter">
+                            ${'●'.repeat(item.win_count)}${'○'.repeat(Math.max(0, 3 - item.win_count))}
+                        </div>
+                        <button onclick="removeItem(\`${item.id}\`)" class="text-red-300 hover:text-red-500 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </div>
+                </li>
+            `).join('');
+            if (items.length < 2) document.getElementById('statusMsg').innerText = "2つ以上追加してね";
+        }
+
+        function drawWheel() {
+            const canvas = document.getElementById('wheel');
+            const ctx = canvas.getContext('2d');
+            const num = items.length || 1;
+            const arc = (Math.PI * 2) / num;
+            ctx.clearRect(0, 0, 400, 400);
+            for (let i = 0; i < num; i++) {
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.beginPath(); ctx.moveTo(200, 200); ctx.arc(200, 200, 200, i * arc, (i + 1) * arc); ctx.fill();
+                ctx.save(); ctx.translate(200, 200); ctx.rotate(i * arc + arc / 2);
+                ctx.fillStyle = 'white'; ctx.font = 'bold 16px Zen Maru Gothic'; ctx.textAlign = 'right';
+                ctx.fillText(items[i] ? items[i].location_name.slice(0, 10) : '待機中', 180, 8); ctx.restore();
+            }
+        }
+
+        function spin() {
+            if (isSpinning || items.length < 2) return alert('サウナを2つ以上入れてね');
+            isSpinning = true;
+            document.getElementById('sound-drum').play();
+            const spinDeg = 3600 + Math.random() * 360;
+            rotation += spinDeg;
+            document.getElementById('wheel').style.transform = `rotate(${rotation}deg)`;
+            
+            setTimeout(() => {
+                isSpinning = false;
+                document.getElementById('sound-cymbal').play();
+                const index = Math.floor(((360 - (rotation % 360) + 270) % 360) / (360 / items.length));
+                const winner = items[index];
+                winner.win_count++;
+                updateWin(winner);
+
+                if (winner.win_count >= 3) {
+                    document.getElementById('statusMsg').innerHTML = `🎊 決定！！ 🎊<br>${winner.location_name}`;
+                    confetti({ particleCount: 150, spread: 70 });
+                } else {
+                    document.getElementById('statusMsg').innerHTML = `${winner.location_name} 当選！<br><span class="text-sm font-normal">あと ${3 - winner.win_count} 回</span>`;
+                }
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
