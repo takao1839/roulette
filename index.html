@@ -3,15 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>リアルタイム・サウナルーレット</title>
+    <title>カスタム比率・サウナルーレット</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
-    <!-- Firebaseライブラリ (v8) -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700&display=swap');
-        body { font-family: 'Zen Maru Gothic', sans-serif; background-color: #f0f9ff; }
+        body { font-family: 'Zen Maru Gothic', sans-serif; background-color: #f0fdfa; }
         #wheel { transition: transform 5s cubic-bezier(0.15, 0, 0.15, 1); }
         .win-active { animation: bounce 0.5s infinite; }
         @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
@@ -19,65 +18,55 @@
 </head>
 <body class="p-4 md:p-8">
 
-    <div class="max-w-4xl mx-auto">
+    <div class="max-w-5xl mx-auto">
         <header class="text-center mb-8">
-            <h1 class="text-3xl font-bold text-blue-600 mb-2">🧖‍♂️ 共有サウナルーレット 🧖‍♀️</h1>
-            <div id="status" class="inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-gray-200 text-gray-500 uppercase tracking-widest">
-                Connecting...
-            </div>
+            <h1 class="text-3xl font-bold text-teal-600 mb-2">🧖‍♂️ カスタム比率サウナルーレット 🧖‍♀️</h1>
+            <div id="status" class="inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-gray-200 text-gray-500 uppercase tracking-widest">Connecting...</div>
         </header>
 
-        <div class="grid md:grid-cols-2 gap-8 items-start">
+        <div class="grid lg:grid-cols-2 gap-8 items-start">
             <!-- 左側：投稿とリスト -->
-            <div class="bg-white p-6 rounded-3xl shadow-xl border-t-8 border-blue-400">
+            <div class="bg-white p-6 rounded-3xl shadow-xl border-t-8 border-teal-400">
                 <div class="mb-6 border-b border-dashed pb-6">
-                    <h2 class="text-xl mb-4 font-bold text-blue-800 italic">✍️ 施設を提案する</h2>
-                    <div class="flex flex-col gap-3">
-                        <input type="text" id="userName" placeholder="あなたの名前" class="border-2 border-blue-50 p-3 rounded-xl outline-none focus:border-blue-400 transition-all shadow-sm">
-                        <input type="text" id="locName" placeholder="サウナ施設名" class="border-2 border-blue-50 p-3 rounded-xl outline-none focus:border-blue-400 transition-all shadow-sm">
-                        <button onclick="postToFirebase()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg transition-all active:scale-95">
-                            リストに追加！
-                        </button>
+                    <h2 class="text-xl mb-4 font-bold text-teal-800">✍️ 施設を提案</h2>
+                    <div class="grid grid-cols-2 gap-2 mb-2">
+                        <input type="text" id="userName" placeholder="名前" class="border-2 border-teal-50 p-3 rounded-xl outline-none focus:border-teal-400 shadow-sm">
+                        <input type="text" id="locName" placeholder="施設名" class="border-2 border-teal-50 p-3 rounded-xl outline-none focus:border-teal-400 shadow-sm">
                     </div>
+                    <div class="flex items-center gap-4 mb-4">
+                        <label class="text-sm font-bold text-teal-600">比率(当たりやすさ):</label>
+                        <input type="number" id="ratioInput" value="1" min="1" max="10" class="w-16 border-2 border-teal-50 p-2 rounded-xl text-center outline-none focus:border-teal-400">
+                        <span class="text-xs text-gray-400">※大きいほど面積が増えます</span>
+                    </div>
+                    <button onclick="postToFirebase()" class="w-full bg-teal-500 hover:bg-teal-600 text-white font-bold py-3 rounded-xl shadow-lg transition active:scale-95">リストに追加！</button>
                 </div>
 
                 <div>
                     <div class="flex justify-between items-end mb-4">
-                        <h2 class="text-lg font-bold text-blue-900">📊 当選回数 (3回で決定)</h2>
+                        <h2 class="text-lg font-bold text-teal-900">📊 候補リスト</h2>
                         <button onclick="resetAllData()" class="text-[10px] text-red-300 hover:text-red-500 font-bold">全消去</button>
                     </div>
-                    <ul id="locationList" class="space-y-2 max-h-64 overflow-y-auto pr-2">
-                        <!-- リストがここに自動で入ります -->
-                    </ul>
+                    <ul id="locationList" class="space-y-3 max-h-96 overflow-y-auto pr-2"></ul>
                 </div>
             </div>
 
             <!-- 右側：ルーレット本体 -->
             <div class="flex flex-col items-center">
-                <div class="relative w-[300px] h-[300px] md:w-[380px] md:h-[380px]">
-                    <!-- 針 -->
-                    <div class="absolute top-[-15px] left-1/2 -translate-x-1/2 z-20 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[30px] border-t-red-500 shadow-md"></div>
-                    
-                    <canvas id="wheel" width="400" height="400" class="w-full h-full rounded-full bg-white shadow-2xl"></canvas>
-                    
-                    <button id="spinBtn" onclick="startSpin()" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-yellow-400 hover:bg-yellow-500 border-4 border-white rounded-full font-bold text-blue-900 shadow-lg z-30 transition transform active:scale-90">
-                        GO!
-                    </button>
+                <div class="relative w-[300px] h-[300px] md:w-[400px] md:h-[400px]">
+                    <div class="absolute top-[-15px] left-1/2 -translate-x-1/2 z-20 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[35px] border-t-red-600 shadow-md"></div>
+                    <canvas id="wheel" width="500" height="500" class="w-full h-full rounded-full bg-white shadow-2xl"></canvas>
+                    <button id="spinBtn" onclick="startSpin()" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-yellow-400 hover:bg-yellow-500 border-4 border-white rounded-full font-bold text-teal-900 shadow-lg z-30 transition transform active:scale-90">GO!</button>
                 </div>
-                
-                <div id="statusMsg" class="mt-8 text-xl font-bold text-blue-800 text-center min-h-[3em] bg-white p-5 rounded-2xl shadow-sm w-full border-2 border-blue-50">
-                    施設を2つ以上入れてね！
-                </div>
+                <div id="statusMsg" class="mt-8 text-xl font-bold text-teal-800 text-center min-h-[3em] bg-white p-5 rounded-2xl shadow-sm w-full border-2 border-teal-50"></div>
             </div>
         </div>
     </div>
 
-    <!-- ドラムロールとシンバルの音 -->
     <audio id="sound-drum" src="https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3"></audio>
     <audio id="sound-cymbal" src="https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3"></audio>
 
     <script>
-        // --- 教えていただいたFirebaseの設定 ---
+        // Firebase設定
         const firebaseConfig = {
             apiKey: "AIzaSyAlSbtHvI4Xsv-WvYkVbgGZpeVqMFSiqfA",
             authDomain: "roulette-c21b9.firebaseapp.com",
@@ -86,11 +75,9 @@
             messagingSenderId: "1037733313679",
             appId: "1:1037733313679:web:bc5a94119503c1231f84fa",
             measurementId: "G-Z3ZBMP2CMV",
-            // Realtime DatabaseのURLを自動生成（シンガポール設定の場合）
             databaseURL: "https://roulette-c21b9-default-rtdb.asia-southeast1.firebasedatabase.app"
         };
 
-        // Firebaseの初期化
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
         const saunaItemsRef = database.ref('sauna_list');
@@ -98,14 +85,13 @@
         let items = [];
         let rotation = 0;
         let isSpinning = false;
-        const colors = ['#FF6B6B', '#4D96FF', '#FFD93D', '#6BCB77', '#9575CD', '#FFA447', '#4DB6AC'];
+        const colors = ['#FF6B6B', '#4D96FF', '#FFD93D', '#6BCB77', '#9575CD', '#FFA447', '#4DB6AC', '#FF9F1C', '#2EC4B6'];
 
         const canvas = document.getElementById('wheel');
         const ctx = canvas.getContext('2d');
         const statusMsg = document.getElementById('statusMsg');
-        const statusBadge = document.getElementById('status');
 
-        // 1. データの同期 (誰かが更新したら全員の画面が勝手に変わる)
+        // データの同期
         saunaItemsRef.on('value', (snapshot) => {
             const data = snapshot.val();
             items = [];
@@ -114,97 +100,119 @@
                     items.push({ id: key, ...data[key] });
                 });
             }
-            statusBadge.innerText = "✅ ONLINE";
-            statusBadge.className = "inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-green-500 text-white uppercase tracking-widest";
+            document.getElementById('status').innerText = "✅ ONLINE";
+            document.getElementById('status').className = "inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-green-500 text-white uppercase tracking-widest";
             updateUI();
             drawWheel();
         });
 
-        // 2. 投稿する
+        // 投稿
         function postToFirebase() {
             const user = document.getElementById('userName').value;
             const loc = document.getElementById('locName').value;
-            if (!user || !loc) return alert('名前と施設名を入れてね！');
+            const ratio = parseInt(document.getElementById('ratioInput').value) || 1;
+
+            if (!user || !loc) return alert('入力してね！');
 
             saunaItemsRef.push({
                 user_name: user,
                 location_name: loc,
-                win_count: 0
+                win_count: 0,
+                ratio: ratio
             });
-
             document.getElementById('locName').value = '';
+            document.getElementById('ratioInput').value = 1;
         }
 
-        // 3. 当選回数を保存する
-        function updateWinCountInFirebase(item) {
-            database.ref('sauna_list/' + item.id).update({
-                win_count: item.win_count
-            });
-        }
-
-        // 4. 全部消す
-        function resetAllData() {
-            if (confirm('すべての投稿と当選回数をリセットしますか？')) {
-                saunaItemsRef.remove();
-                statusMsg.innerText = "リセットしました。新しく追加してね！";
+        // 個別削除
+        function deleteItem(id) {
+            if (confirm('この項目を削除しますか？')) {
+                database.ref('sauna_list/' + id).remove();
             }
+        }
+
+        // 回数更新
+        function updateWinCount(item) {
+            database.ref('sauna_list/' + item.id).update({ win_count: item.win_count });
+        }
+
+        // 全リセット
+        function resetAllData() {
+            if (confirm('すべてリセットしますか？')) saunaItemsRef.remove();
         }
 
         function updateUI() {
             const list = document.getElementById('locationList');
             if (items.length === 0) {
-                list.innerHTML = "<li class='text-gray-400 italic text-sm text-center py-4'>まだ投稿がありません</li>";
+                list.innerHTML = "<p class='text-gray-400 italic text-center py-4'>候補がありません</p>";
                 return;
             }
             list.innerHTML = items.map(item => `
-                <li class="flex justify-between items-center p-3 bg-blue-50 rounded-2xl border-2 ${item.win_count >= 3 ? 'border-yellow-400 bg-yellow-50 win-active' : 'border-white'}">
-                    <div>
-                        <div class="text-sm font-bold text-gray-800">${item.location_name}</div>
-                        <div class="text-[10px] text-blue-400 font-bold uppercase tracking-tighter">By ${item.name || item.user_name}</div>
+                <li class="flex justify-between items-center p-3 bg-teal-50 rounded-2xl border-2 ${item.win_count >= 3 ? 'border-yellow-400 bg-yellow-50 win-active' : 'border-white'}">
+                    <div class="flex-1">
+                        <div class="text-sm font-bold text-teal-900">${item.location_name} <span class="text-xs text-teal-400 font-normal ml-2">比率:${item.ratio}</span></div>
+                        <div class="text-[10px] text-teal-400 uppercase tracking-tighter">By ${item.user_name}</div>
                     </div>
-                    <div class="text-blue-500 font-mono text-xl tracking-widest">
-                        ${'●'.repeat(item.win_count)}${'○'.repeat(Math.max(0, 3 - item.win_count))}
+                    <div class="flex items-center gap-3">
+                        <div class="text-teal-500 font-mono text-xl tracking-tighter">
+                            ${'●'.repeat(item.win_count)}${'○'.repeat(Math.max(0, 3 - item.win_count))}
+                        </div>
+                        <button onclick="deleteItem('${item.id}')" class="text-red-300 hover:text-red-500 transition p-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
                     </div>
                 </li>
             `).join('');
         }
 
+        // ルーレット描画 (比率に対応)
         function drawWheel() {
-            const num = items.length || 1;
-            const arc = (Math.PI * 2) / num;
-            ctx.clearRect(0, 0, 400, 400);
+            const totalRatio = items.reduce((sum, item) => sum + (item.ratio || 1), 0);
+            const num = items.length;
+            if (num === 0) {
+                ctx.clearRect(0,0,500,500);
+                return;
+            }
 
-            for (let i = 0; i < num; i++) {
+            ctx.clearRect(0, 0, 500, 500);
+            let currentAngle = 0;
+
+            items.forEach((item, i) => {
+                const ratio = item.ratio || 1;
+                const arc = (Math.PI * 2) * (ratio / totalRatio);
+
                 ctx.fillStyle = colors[i % colors.length];
                 ctx.beginPath();
-                ctx.moveTo(200, 200);
-                ctx.arc(200, 200, 200, i * arc, (i + 1) * arc);
+                ctx.moveTo(250, 250);
+                ctx.arc(250, 250, 250, currentAngle, currentAngle + arc);
                 ctx.fill();
                 ctx.strokeStyle = 'white';
-                ctx.lineWidth = 4;
+                ctx.lineWidth = 3;
                 ctx.stroke();
 
+                // テキスト
                 ctx.save();
-                ctx.translate(200, 200);
-                ctx.rotate(i * arc + arc / 2);
+                ctx.translate(250, 250);
+                ctx.rotate(currentAngle + arc / 2);
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'white';
                 ctx.font = 'bold 18px Zen Maru Gothic';
-                const text = items[i] ? items[i].location_name : 'サウナ待機';
-                ctx.fillText(text.slice(0, 10), 180, 8);
+                ctx.fillText(item.location_name.slice(0, 10), 230, 8);
                 ctx.restore();
-            }
+
+                currentAngle += arc;
+            });
         }
 
+        // 回転開始
         function startSpin() {
-            if (isSpinning || items.length < 2) {
-                if (items.length < 2) alert('サウナを2つ以上入れてね！');
-                return;
-            }
+            if (isSpinning || items.length < 2) return alert('2つ以上追加してね！');
             
             isSpinning = true;
             document.getElementById('sound-drum').play();
-            statusMsg.innerText = "何が出るかな...？♨️";
+            statusMsg.innerText = "抽選中...";
 
             const spinDeg = 3600 + Math.random() * 360;
             rotation += spinDeg;
@@ -214,27 +222,37 @@
                 isSpinning = false;
                 document.getElementById('sound-cymbal').play();
                 
-                const actualDeg = rotation % 360;
-                const index = Math.floor(((360 - actualDeg + 270) % 360) / (360 / items.length));
-                const winner = items[index];
+                // 当選判定 (比率を考慮)
+                const totalRatio = items.reduce((sum, item) => sum + (item.ratio || 1), 0);
+                const actualDeg = (rotation % 360);
+                // 針は真上(270度方向)にあるので調整
+                let targetDeg = (360 - actualDeg + 270) % 360;
+                
+                let cumulativeAngle = 0;
+                let winner = items[0];
+
+                for (let item of items) {
+                    const arcDeg = 360 * ((item.ratio || 1) / totalRatio);
+                    if (targetDeg >= cumulativeAngle && targetDeg < cumulativeAngle + arcDeg) {
+                        winner = item;
+                        break;
+                    }
+                    cumulativeAngle += arcDeg;
+                }
 
                 winner.win_count++;
-                updateWinCountInFirebase(winner);
+                updateWinCount(winner);
 
                 if (winner.win_count >= 3) {
-                    statusMsg.innerHTML = `✨ 決定！！ ✨<br><span class="text-2xl">${winner.location_name}</span><br><span class="text-sm font-normal">投稿者: ${winner.user_name}さん</span>`;
-                    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+                    statusMsg.innerHTML = `✨ 決定！！ ✨<br>${winner.location_name}`;
+                    confetti({ particleCount: 150, spread: 70 });
                 } else {
-                    statusMsg.innerHTML = `当選：${winner.location_name}<br><span class="text-sm font-normal">(${winner.user_name}さんの投稿・あと ${3 - winner.win_count} 回当選で決定)</span>`;
+                    statusMsg.innerHTML = `${winner.location_name} 当選！<br><span class="text-sm font-normal">あと ${3 - winner.win_count} 回</span>`;
                 }
             }, 5000);
         }
 
-        window.onload = () => {
-            if (!items.length) {
-                statusMsg.innerText = "施設を追加してスタート！";
-            }
-        };
+        window.onload = () => { if(!items.length) statusMsg.innerText = "施設を追加してね！"; };
     </script>
 </body>
 </html>
