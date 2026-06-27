@@ -29,13 +29,6 @@
                     <div class="flex flex-col gap-3">
                         <input type="text" id="userName" placeholder="あなたの名前" class="border-2 border-blue-50 p-3 rounded-xl outline-none focus:border-blue-400">
                         <input type="text" id="locName" placeholder="サウナ施設名" class="border-2 border-blue-50 p-3 rounded-xl outline-none focus:border-blue-400">
-                        
-                        <div class="flex items-center gap-2">
-                            <label class="text-sm font-bold text-gray-600 shrink-0">比率（重み）:</label>
-                            <input type="number" id="weight" value="1" min="1" max="10" class="border-2 border-blue-50 p-3 rounded-xl outline-none focus:border-blue-400 w-20 text-center font-bold">
-                            <span class="text-xs text-gray-400">※大きい数字ほど当たりやすい</span>
-                        </div>
-                        
                         <button onclick="addSauna()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg transition active:scale-95">
                             リストに追加
                         </button>
@@ -65,63 +58,4 @@
         </div>
     </div>
 
-    <audio id="sound-drum" src="https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3"></audio>
-    <audio id="sound-cymbal" src="https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3"></audio>
-
-    <script>
-        // --- あなたのFirebase Config ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyAlSbtHvI4Xsv-WvYkVbgGZpeVqMFSiqfA",
-            authDomain: "roulette-c21b9.firebaseapp.com",
-            projectId: "roulette-c21b9",
-            storageBucket: "roulette-c21b9.firebasestorage.app",
-            messagingSenderId: "1037733313679",
-            appId: "1:1037733313679:web:bc5a94119503c1231f84fa",
-            measurementId: "G-Z3ZBMP2CMV",
-            databaseURL: "https://roulette-c21b9-default-rtdb.asia-southeast1.firebasedatabase.app"
-        };
-
-        // Firebase初期化
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-        const saunaRef = db.ref('sauna_list');
-
-        let items = [];
-        let rotation = 0;
-        let isSpinning = false;
-        const colors = ['#FF6B6B', '#4D96FF', '#FFD93D', '#6BCB77', '#9575CD', '#FFA447', '#4DB6AC'];
-
-        // 1. データのリアルタイム受信（安全性を最大限強化）
-        saunaRef.on('value', (snapshot) => {
-            try {
-                const data = snapshot.val();
-                items = [];
-                if (data) {
-                    Object.keys(data).forEach(key => {
-                        const itemData = data[key];
-                        if (!itemData) return;
-
-                        // どんなデータが入っていてもエラーにならないように安全にパース
-                        let w = 1;
-                        if (itemData.weight !== undefined && itemData.weight !== null) {
-                            w = parseInt(itemData.weight, 10);
-                        }
-                        if (isNaN(w) || w < 1) w = 1;
-
-                        let wc = 0;
-                        if (itemData.win_count !== undefined && itemData.win_count !== null) {
-                            wc = parseInt(itemData.win_count, 10);
-                        }
-                        if (isNaN(wc)) wc = 0;
-
-                        items.push({
-                            id: key,
-                            user_name: itemData.user_name || '不明',
-                            location_name: itemData.location_name || '未設定',
-                            win_count: wc,
-                            weight: w
-                        });
-                    });
-                }
-                document.getElementById('status').innerText = "✅ ONLINE";
-                document.getElementById('status').className = "inline-block px-3 py-
+    <audio id="sound-drum" src="https://assets.
