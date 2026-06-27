@@ -119,11 +119,18 @@
         }
 
         // 3. 項目の削除 (ここが新規追加)
-        function removeItem(id) {
-            if (confirm('この項目をリストから消しますか？')) {
-                db.ref('sauna_list/' + id).remove();
-            }
-        }
+function removeItem(id) {
+    if (confirm('この項目をリストから消しますか？')) {
+        saunaRef.child(id).remove()
+            .then(() => {
+                console.log("削除成功");
+            })
+            .catch((error) => {
+                console.error("削除エラー:", error);
+                alert("削除に失敗しました: " + error.message);
+            });
+    }
+}
 
         // 4. 当選回数の更新
         function updateWin(item) {
