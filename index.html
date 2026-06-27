@@ -3,73 +3,98 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>サウナルーレット</title>
+    <title>リアルタイム・サウナルーレット</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
-    <!-- Supabaseライブラリを先に読み込む -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Firebaseライブラリ (v8) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700&display=swap');
-        body { font-family: 'Zen Maru Gothic', sans-serif; background-color: #e0f2fe; }
+        body { font-family: 'Zen Maru Gothic', sans-serif; background-color: #f0f9ff; }
         #wheel { transition: transform 5s cubic-bezier(0.15, 0, 0.15, 1); }
+        .win-active { animation: bounce 0.5s infinite; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
     </style>
 </head>
-<body class="p-4 md:p-8 text-slate-800">
+<body class="p-4 md:p-8">
 
     <div class="max-w-4xl mx-auto">
         <header class="text-center mb-8">
             <h1 class="text-3xl font-bold text-blue-600 mb-2">🧖‍♂️ 共有サウナルーレット 🧖‍♀️</h1>
-            <div id="connection-badge" class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-gray-200 text-gray-500">
-                接続確認中...
+            <div id="status" class="inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-gray-200 text-gray-500 uppercase tracking-widest">
+                Connecting...
             </div>
         </header>
 
         <div class="grid md:grid-cols-2 gap-8 items-start">
-            <!-- 投稿エリア -->
-            <div class="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-blue-400">
-                <div class="mb-6 border-b pb-4">
-                    <h2 class="text-xl mb-4 font-bold text-blue-800">✍️ 候補を投稿</h2>
-                    <div class="flex flex-col gap-2">
-                        <input type="text" id="userName" placeholder="名前" class="border p-2 rounded outline-none focus:ring-2 focus:ring-blue-300">
-                        <input type="text" id="locName" placeholder="サウナ施設名" class="border p-2 rounded outline-none focus:ring-2 focus:ring-blue-300">
-                        <button onclick="addLocation()" id="addBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded shadow-md transition-all active:scale-95">投稿する！</button>
+            <!-- 左側：投稿とリスト -->
+            <div class="bg-white p-6 rounded-3xl shadow-xl border-t-8 border-blue-400">
+                <div class="mb-6 border-b border-dashed pb-6">
+                    <h2 class="text-xl mb-4 font-bold text-blue-800 italic">✍️ 施設を提案する</h2>
+                    <div class="flex flex-col gap-3">
+                        <input type="text" id="userName" placeholder="あなたの名前" class="border-2 border-blue-50 p-3 rounded-xl outline-none focus:border-blue-400 transition-all shadow-sm">
+                        <input type="text" id="locName" placeholder="サウナ施設名" class="border-2 border-blue-50 p-3 rounded-xl outline-none focus:border-blue-400 transition-all shadow-sm">
+                        <button onclick="postToFirebase()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg transition-all active:scale-95">
+                            リストに追加！
+                        </button>
                     </div>
                 </div>
 
                 <div>
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-lg font-bold">📊 候補リスト</h2>
-                        <button onclick="resetAll()" class="text-[10px] text-red-300 hover:text-red-500 uppercase tracking-widest">Reset All</button>
+                    <div class="flex justify-between items-end mb-4">
+                        <h2 class="text-lg font-bold text-blue-900">📊 当選回数 (3回で決定)</h2>
+                        <button onclick="resetAllData()" class="text-[10px] text-red-300 hover:text-red-500 font-bold">全消去</button>
                     </div>
-                    <ul id="locationList" class="space-y-2 text-sm text-gray-400 italic">
-                        読み込みを待っています...
+                    <ul id="locationList" class="space-y-2 max-h-64 overflow-y-auto pr-2">
+                        <!-- リストがここに自動で入ります -->
                     </ul>
                 </div>
             </div>
 
-            <!-- ルーレットエリア -->
+            <!-- 右側：ルーレット本体 -->
             <div class="flex flex-col items-center">
-                <div class="relative w-[280px] h-[280px] md:w-[360px] md:h-[360px]">
-                    <div class="absolute top-[-15px] left-1/2 -translate-x-1/2 z-20 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[30px] border-t-red-500"></div>
+                <div class="relative w-[300px] h-[300px] md:w-[380px] md:h-[380px]">
+                    <!-- 針 -->
+                    <div class="absolute top-[-15px] left-1/2 -translate-x-1/2 z-20 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[30px] border-t-red-500 shadow-md"></div>
+                    
                     <canvas id="wheel" width="400" height="400" class="w-full h-full rounded-full bg-white shadow-2xl"></canvas>
-                    <button id="spinBtn" onclick="spin()" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-yellow-400 border-4 border-white rounded-full font-bold shadow-lg z-30 active:scale-90 transition-transform">GO!</button>
+                    
+                    <button id="spinBtn" onclick="startSpin()" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-yellow-400 hover:bg-yellow-500 border-4 border-white rounded-full font-bold text-blue-900 shadow-lg z-30 transition transform active:scale-90">
+                        GO!
+                    </button>
                 </div>
-                <div id="statusMsg" class="mt-8 text-lg font-bold text-blue-800 text-center min-h-[3em] bg-white p-4 rounded-xl shadow-sm w-full border border-blue-50">
-                    サウナを追加してね！
+                
+                <div id="statusMsg" class="mt-8 text-xl font-bold text-blue-800 text-center min-h-[3em] bg-white p-5 rounded-2xl shadow-sm w-full border-2 border-blue-50">
+                    施設を2つ以上入れてね！
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- ドラムロールとシンバルの音 -->
     <audio id="sound-drum" src="https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3"></audio>
     <audio id="sound-cymbal" src="https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3"></audio>
 
     <script>
-        // 設定値 (空白を完全に取り除いたもの)
-        const S_URL = 'https://ajrrcgocmfnwzoskxups.supabase.co';
-        const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqcnJjZ29jbWZud3pvc2t4dXBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDg1NjUsImV4cCI6MjA5ODA4NDU2NX0.UbFxhyLoXCYnopPfVMdQLBfL-Ob0P5LBPK4v97a-y48';
-        
-        let supabase;
+        // --- 教えていただいたFirebaseの設定 ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAlSbtHvI4Xsv-WvYkVbgGZpeVqMFSiqfA",
+            authDomain: "roulette-c21b9.firebaseapp.com",
+            projectId: "roulette-c21b9",
+            storageBucket: "roulette-c21b9.firebasestorage.app",
+            messagingSenderId: "1037733313679",
+            appId: "1:1037733313679:web:bc5a94119503c1231f84fa",
+            measurementId: "G-Z3ZBMP2CMV",
+            // Realtime DatabaseのURLを自動生成（シンガポール設定の場合）
+            databaseURL: "https://roulette-c21b9-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+
+        // Firebaseの初期化
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+        const saunaItemsRef = database.ref('sauna_list');
+
         let items = [];
         let rotation = 0;
         let isSpinning = false;
@@ -78,142 +103,138 @@
         const canvas = document.getElementById('wheel');
         const ctx = canvas.getContext('2d');
         const statusMsg = document.getElementById('statusMsg');
-        const badge = document.getElementById('connection-badge');
+        const statusBadge = document.getElementById('status');
 
-        // 初期化処理
-        async function init() {
-            try {
-                // Supabaseクライアントの作成
-                supabase = window.supabase.createClient(S_URL, S_KEY);
-                await loadData();
-            } catch (err) {
-                badge.innerText = "❌ 起動エラー";
-                badge.classList.replace('bg-gray-200', 'bg-red-500');
-                badge.classList.replace('text-gray-500', 'text-white');
-                console.error(err);
+        // 1. データの同期 (誰かが更新したら全員の画面が勝手に変わる)
+        saunaItemsRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            items = [];
+            if (data) {
+                Object.keys(data).forEach(key => {
+                    items.push({ id: key, ...data[key] });
+                });
             }
-        }
+            statusBadge.innerText = "✅ ONLINE";
+            statusBadge.className = "inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-green-500 text-white uppercase tracking-widest";
+            updateUI();
+            drawWheel();
+        });
 
-        async function loadData() {
-            try {
-                const { data, error } = await supabase.from('sauna_list').select('*').order('created_at', { ascending: true });
-                if (error) throw error;
-                
-                items = data.map(d => ({ id: d.id, name: d.user_name, location: d.location_name, count: d.win_count }));
-                
-                // 接続成功表示
-                badge.innerText = "✅ 接続完了";
-                badge.classList.replace('bg-gray-200', 'bg-green-500');
-                badge.classList.replace('text-gray-500', 'text-white');
-                
-                updateUI();
-                drawWheel();
-            } catch (err) {
-                badge.innerText = "❌ 接続失敗: " + err.message;
-                badge.classList.replace('bg-gray-200', 'bg-red-500');
-                badge.classList.replace('text-gray-500', 'text-white');
-            }
-        }
-
-        async function addLocation() {
+        // 2. 投稿する
+        function postToFirebase() {
             const user = document.getElementById('userName').value;
             const loc = document.getElementById('locName').value;
-            if (!user || !loc) return alert('入力してください');
+            if (!user || !loc) return alert('名前と施設名を入れてね！');
 
-            const btn = document.getElementById('addBtn');
-            btn.disabled = true;
-            btn.innerText = "保存中...";
+            saunaItemsRef.push({
+                user_name: user,
+                location_name: loc,
+                win_count: 0
+            });
 
-            try {
-                const { error } = await supabase.from('sauna_list').insert([{ user_name: user, location_name: loc, win_count: 0 }]);
-                if (error) throw error;
-                document.getElementById('locName').value = '';
-                await loadData();
-            } catch (err) {
-                alert("保存できませんでした: " + err.message);
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "投稿する！";
-            }
+            document.getElementById('locName').value = '';
         }
 
-        async function saveWin(item) {
-            await supabase.from('sauna_list').update({ win_count: item.count }).eq('id', item.id);
+        // 3. 当選回数を保存する
+        function updateWinCountInFirebase(item) {
+            database.ref('sauna_list/' + item.id).update({
+                win_count: item.win_count
+            });
         }
 
-        async function resetAll() {
-            if (!confirm('全てのデータを消去しますか？')) return;
-            try {
-                const { error } = await supabase.from('sauna_list').delete().neq('id', 0);
-                if (error) throw error;
-                await loadData();
-            } catch (err) {
-                alert("リセットに失敗しました");
+        // 4. 全部消す
+        function resetAllData() {
+            if (confirm('すべての投稿と当選回数をリセットしますか？')) {
+                saunaItemsRef.remove();
+                statusMsg.innerText = "リセットしました。新しく追加してね！";
             }
         }
 
         function updateUI() {
             const list = document.getElementById('locationList');
             if (items.length === 0) {
-                list.innerHTML = "候補がありません。";
-                statusMsg.innerText = "施設を追加してスタート！";
+                list.innerHTML = "<li class='text-gray-400 italic text-sm text-center py-4'>まだ投稿がありません</li>";
                 return;
             }
             list.innerHTML = items.map(item => `
-                <li class="flex justify-between items-center p-3 bg-white rounded-xl border ${item.count >= 3 ? 'border-yellow-500 bg-yellow-50 ring-2 ring-yellow-400' : 'border-gray-100'}">
-                    <div class="flex-1">
-                        <div class="text-sm font-bold text-gray-800">${item.location}</div>
-                        <div class="text-[10px] text-gray-400">${item.name}さん</div>
+                <li class="flex justify-between items-center p-3 bg-blue-50 rounded-2xl border-2 ${item.win_count >= 3 ? 'border-yellow-400 bg-yellow-50 win-active' : 'border-white'}">
+                    <div>
+                        <div class="text-sm font-bold text-gray-800">${item.location_name}</div>
+                        <div class="text-[10px] text-blue-400 font-bold uppercase tracking-tighter">By ${item.name || item.user_name}</div>
                     </div>
-                    <div class="text-blue-500 font-mono text-xl tracking-tighter">
-                        ${'●'.repeat(item.count)}${'○'.repeat(Math.max(0, 3-item.count))}
+                    <div class="text-blue-500 font-mono text-xl tracking-widest">
+                        ${'●'.repeat(item.win_count)}${'○'.repeat(Math.max(0, 3 - item.win_count))}
                     </div>
                 </li>
             `).join('');
-            if (items.length >= 2) statusMsg.innerText = "準備OK！";
         }
 
         function drawWheel() {
             const num = items.length || 1;
             const arc = (Math.PI * 2) / num;
             ctx.clearRect(0, 0, 400, 400);
+
             for (let i = 0; i < num; i++) {
                 ctx.fillStyle = colors[i % colors.length];
-                ctx.beginPath(); ctx.moveTo(200, 200); ctx.arc(200, 200, 200, i * arc, (i + 1) * arc); ctx.fill();
-                ctx.save(); ctx.translate(200, 200); ctx.rotate(i * arc + arc / 2);
-                ctx.fillStyle = 'white'; ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'right';
-                ctx.fillText(items[i] ? items[i].location.slice(0,8) : 'お待ちしてます', 180, 8); ctx.restore();
+                ctx.beginPath();
+                ctx.moveTo(200, 200);
+                ctx.arc(200, 200, 200, i * arc, (i + 1) * arc);
+                ctx.fill();
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+
+                ctx.save();
+                ctx.translate(200, 200);
+                ctx.rotate(i * arc + arc / 2);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 18px Zen Maru Gothic';
+                const text = items[i] ? items[i].location_name : 'サウナ待機';
+                ctx.fillText(text.slice(0, 10), 180, 8);
+                ctx.restore();
             }
         }
 
-        function spin() {
-            if (isSpinning || items.length < 2) return;
+        function startSpin() {
+            if (isSpinning || items.length < 2) {
+                if (items.length < 2) alert('サウナを2つ以上入れてね！');
+                return;
+            }
+            
             isSpinning = true;
             document.getElementById('sound-drum').play();
+            statusMsg.innerText = "何が出るかな...？♨️";
+
             const spinDeg = 3600 + Math.random() * 360;
             rotation += spinDeg;
             canvas.style.transform = `rotate(${rotation}deg)`;
-            statusMsg.innerText = "何が出るかな...？";
-            setTimeout(async () => {
+
+            setTimeout(() => {
                 isSpinning = false;
                 document.getElementById('sound-cymbal').play();
+                
                 const actualDeg = rotation % 360;
                 const index = Math.floor(((360 - actualDeg + 270) % 360) / (360 / items.length));
                 const winner = items[index];
-                winner.count++;
-                await saveWin(winner);
-                if (winner.count >= 3) {
-                    statusMsg.innerHTML = `✨ ${winner.location} ✨<br>に決定しました！`;
-                    confetti({ particleCount: 150, spread: 70, origin: { y: 0.7 } });
+
+                winner.win_count++;
+                updateWinCountInFirebase(winner);
+
+                if (winner.win_count >= 3) {
+                    statusMsg.innerHTML = `✨ 決定！！ ✨<br><span class="text-2xl">${winner.location_name}</span><br><span class="text-sm font-normal">投稿者: ${winner.user_name}さん</span>`;
+                    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
                 } else {
-                    statusMsg.innerHTML = `${winner.location}<br><span class="text-sm font-normal">当選：${winner.count}回目</span>`;
+                    statusMsg.innerHTML = `当選：${winner.location_name}<br><span class="text-sm font-normal">(${winner.user_name}さんの投稿・あと ${3 - winner.win_count} 回当選で決定)</span>`;
                 }
-                updateUI();
             }, 5000);
         }
 
-        // ページ読み込み完了時に初期化
-        window.onload = init;
+        window.onload = () => {
+            if (!items.length) {
+                statusMsg.innerText = "施設を追加してスタート！";
+            }
+        };
     </script>
 </body>
 </html>
