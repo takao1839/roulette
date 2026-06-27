@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>サウナルーレット・プロ</title>
+    <title>サウナルーレット</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <!-- Supabaseライブラリを先に読み込む -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700&display=swap');
@@ -13,44 +14,48 @@
         #wheel { transition: transform 5s cubic-bezier(0.15, 0, 0.15, 1); }
     </style>
 </head>
-<body class="p-4 md:p-8">
+<body class="p-4 md:p-8 text-slate-800">
 
     <div class="max-w-4xl mx-auto">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-blue-600 mb-2">🧖‍♂️ 共有サウナルーレット 🧖‍♀️</h1>
-            <p id="debug-status" class="text-sm text-red-500 font-bold">システム接続中...</p>
+            <h1 class="text-3xl font-bold text-blue-600 mb-2">🧖‍♂️ 共有サウナルーレット 🧖‍♀️</h1>
+            <div id="connection-badge" class="inline-block px-3 py-1 rounded-full text-xs font-bold bg-gray-200 text-gray-500">
+                接続確認中...
+            </div>
         </header>
 
         <div class="grid md:grid-cols-2 gap-8 items-start">
+            <!-- 投稿エリア -->
             <div class="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-blue-400">
                 <div class="mb-6 border-b pb-4">
-                    <h2 class="text-xl mb-4 font-bold italic text-blue-800">✍️ 候補を投稿</h2>
+                    <h2 class="text-xl mb-4 font-bold text-blue-800">✍️ 候補を投稿</h2>
                     <div class="flex flex-col gap-2">
-                        <input type="text" id="userName" placeholder="あなたの名前" class="border p-2 rounded focus:ring-2 focus:ring-blue-300 outline-none">
-                        <input type="text" id="locName" placeholder="サウナ施設名" class="border p-2 rounded focus:ring-2 focus:ring-blue-300 outline-none">
-                        <button onclick="addLocation()" id="addBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded transition shadow-md">投稿して保存！</button>
+                        <input type="text" id="userName" placeholder="名前" class="border p-2 rounded outline-none focus:ring-2 focus:ring-blue-300">
+                        <input type="text" id="locName" placeholder="サウナ施設名" class="border p-2 rounded outline-none focus:ring-2 focus:ring-blue-300">
+                        <button onclick="addLocation()" id="addBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded shadow-md transition-all active:scale-95">投稿する！</button>
                     </div>
                 </div>
 
                 <div>
                     <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-bold text-blue-800">📊 候補リスト</h2>
-                        <button onclick="resetAll()" class="text-xs text-red-400 hover:underline">全リセット</button>
+                        <h2 class="text-lg font-bold">📊 候補リスト</h2>
+                        <button onclick="resetAll()" class="text-[10px] text-red-300 hover:text-red-500 uppercase tracking-widest">Reset All</button>
                     </div>
-                    <ul id="locationList" class="space-y-2 text-gray-500 italic text-sm">
-                        投稿をお待ちしています...
+                    <ul id="locationList" class="space-y-2 text-sm text-gray-400 italic">
+                        読み込みを待っています...
                     </ul>
                 </div>
             </div>
 
+            <!-- ルーレットエリア -->
             <div class="flex flex-col items-center">
-                <div class="relative w-[300px] h-[300px] md:w-[380px] md:h-[380px]">
+                <div class="relative w-[280px] h-[280px] md:w-[360px] md:h-[360px]">
                     <div class="absolute top-[-15px] left-1/2 -translate-x-1/2 z-20 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[30px] border-t-red-500"></div>
                     <canvas id="wheel" width="400" height="400" class="w-full h-full rounded-full bg-white shadow-2xl"></canvas>
-                    <button id="spinBtn" onclick="spin()" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-yellow-400 border-4 border-white rounded-full font-bold shadow-lg z-30 transition transform active:scale-95 text-blue-900">GO!</button>
+                    <button id="spinBtn" onclick="spin()" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-yellow-400 border-4 border-white rounded-full font-bold shadow-lg z-30 active:scale-90 transition-transform">GO!</button>
                 </div>
-                <div id="statusMsg" class="mt-8 text-xl font-bold text-blue-800 text-center min-h-[3em] bg-white p-4 rounded-xl shadow-sm w-full border border-blue-100">
-                    施設を追加してスタート！
+                <div id="statusMsg" class="mt-8 text-lg font-bold text-blue-800 text-center min-h-[3em] bg-white p-4 rounded-xl shadow-sm w-full border border-blue-50">
+                    サウナを追加してね！
                 </div>
             </div>
         </div>
@@ -60,12 +65,11 @@
     <audio id="sound-cymbal" src="https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3"></audio>
 
     <script>
-        // --- 設定 (提供された情報を修正して入力済み) ---
-        const SUPABASE_URL = 'https://ajrrcgocmfnwzoskxups.supabase.co'; 
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqcnJjZ29jbWZud3pvc2t4dXBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDg1NjUsImV4cCI6MjA5ODA4NDU2NX0.UbFxhyLoXCYnopPfVMdQLBfL-Ob0P5LBPK4v97a-y48';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-        const debugStatus = document.getElementById('debug-status');
+        // 設定値 (空白を完全に取り除いたもの)
+        const S_URL = 'https://ajrrcgocmfnwzoskxups.supabase.co';
+        const S_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqcnJjZ29jbWZud3pvc2t4dXBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDg1NjUsImV4cCI6MjA5ODA4NDU2NX0.UbFxhyLoXCYnopPfVMdQLBfL-Ob0P5LBPK4v97a-y48';
+        
+        let supabase;
         let items = [];
         let rotation = 0;
         let isSpinning = false;
@@ -74,21 +78,142 @@
         const canvas = document.getElementById('wheel');
         const ctx = canvas.getContext('2d');
         const statusMsg = document.getElementById('statusMsg');
+        const badge = document.getElementById('connection-badge');
+
+        // 初期化処理
+        async function init() {
+            try {
+                // Supabaseクライアントの作成
+                supabase = window.supabase.createClient(S_URL, S_KEY);
+                await loadData();
+            } catch (err) {
+                badge.innerText = "❌ 起動エラー";
+                badge.classList.replace('bg-gray-200', 'bg-red-500');
+                badge.classList.replace('text-gray-500', 'text-white');
+                console.error(err);
+            }
+        }
 
         async function loadData() {
-            debugStatus.innerText = "データ読み込み中...";
             try {
                 const { data, error } = await supabase.from('sauna_list').select('*').order('created_at', { ascending: true });
                 if (error) throw error;
                 
                 items = data.map(d => ({ id: d.id, name: d.user_name, location: d.location_name, count: d.win_count }));
-                debugStatus.innerText = "✅ 接続完了";
-                debugStatus.classList.replace('text-red-500', 'text-green-500');
+                
+                // 接続成功表示
+                badge.innerText = "✅ 接続完了";
+                badge.classList.replace('bg-gray-200', 'bg-green-500');
+                badge.classList.replace('text-gray-500', 'text-white');
                 
                 updateUI();
                 drawWheel();
             } catch (err) {
-                console.error(err);
-                debugStatus.innerText = "❌ 接続失敗: " + err.message;
+                badge.innerText = "❌ 接続失敗: " + err.message;
+                badge.classList.replace('bg-gray-200', 'bg-red-500');
+                badge.classList.replace('text-gray-500', 'text-white');
             }
         }
+
+        async function addLocation() {
+            const user = document.getElementById('userName').value;
+            const loc = document.getElementById('locName').value;
+            if (!user || !loc) return alert('入力してください');
+
+            const btn = document.getElementById('addBtn');
+            btn.disabled = true;
+            btn.innerText = "保存中...";
+
+            try {
+                const { error } = await supabase.from('sauna_list').insert([{ user_name: user, location_name: loc, win_count: 0 }]);
+                if (error) throw error;
+                document.getElementById('locName').value = '';
+                await loadData();
+            } catch (err) {
+                alert("保存できませんでした: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "投稿する！";
+            }
+        }
+
+        async function saveWin(item) {
+            await supabase.from('sauna_list').update({ win_count: item.count }).eq('id', item.id);
+        }
+
+        async function resetAll() {
+            if (!confirm('全てのデータを消去しますか？')) return;
+            try {
+                const { error } = await supabase.from('sauna_list').delete().neq('id', 0);
+                if (error) throw error;
+                await loadData();
+            } catch (err) {
+                alert("リセットに失敗しました");
+            }
+        }
+
+        function updateUI() {
+            const list = document.getElementById('locationList');
+            if (items.length === 0) {
+                list.innerHTML = "候補がありません。";
+                statusMsg.innerText = "施設を追加してスタート！";
+                return;
+            }
+            list.innerHTML = items.map(item => `
+                <li class="flex justify-between items-center p-3 bg-white rounded-xl border ${item.count >= 3 ? 'border-yellow-500 bg-yellow-50 ring-2 ring-yellow-400' : 'border-gray-100'}">
+                    <div class="flex-1">
+                        <div class="text-sm font-bold text-gray-800">${item.location}</div>
+                        <div class="text-[10px] text-gray-400">${item.name}さん</div>
+                    </div>
+                    <div class="text-blue-500 font-mono text-xl tracking-tighter">
+                        ${'●'.repeat(item.count)}${'○'.repeat(Math.max(0, 3-item.count))}
+                    </div>
+                </li>
+            `).join('');
+            if (items.length >= 2) statusMsg.innerText = "準備OK！";
+        }
+
+        function drawWheel() {
+            const num = items.length || 1;
+            const arc = (Math.PI * 2) / num;
+            ctx.clearRect(0, 0, 400, 400);
+            for (let i = 0; i < num; i++) {
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.beginPath(); ctx.moveTo(200, 200); ctx.arc(200, 200, 200, i * arc, (i + 1) * arc); ctx.fill();
+                ctx.save(); ctx.translate(200, 200); ctx.rotate(i * arc + arc / 2);
+                ctx.fillStyle = 'white'; ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'right';
+                ctx.fillText(items[i] ? items[i].location.slice(0,8) : 'お待ちしてます', 180, 8); ctx.restore();
+            }
+        }
+
+        function spin() {
+            if (isSpinning || items.length < 2) return;
+            isSpinning = true;
+            document.getElementById('sound-drum').play();
+            const spinDeg = 3600 + Math.random() * 360;
+            rotation += spinDeg;
+            canvas.style.transform = `rotate(${rotation}deg)`;
+            statusMsg.innerText = "何が出るかな...？";
+            setTimeout(async () => {
+                isSpinning = false;
+                document.getElementById('sound-cymbal').play();
+                const actualDeg = rotation % 360;
+                const index = Math.floor(((360 - actualDeg + 270) % 360) / (360 / items.length));
+                const winner = items[index];
+                winner.count++;
+                await saveWin(winner);
+                if (winner.count >= 3) {
+                    statusMsg.innerHTML = `✨ ${winner.location} ✨<br>に決定しました！`;
+                    confetti({ particleCount: 150, spread: 70, origin: { y: 0.7 } });
+                } else {
+                    statusMsg.innerHTML = `${winner.location}<br><span class="text-sm font-normal">当選：${winner.count}回目</span>`;
+                }
+                updateUI();
+            }, 5000);
+        }
+
+        // ページ読み込み完了時に初期化
+        window.onload = init;
+    </script>
+</body>
+</html>
