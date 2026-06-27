@@ -58,4 +58,112 @@
         </div>
     </div>
 
-    <audio id="sound-drum" src="https://assets.
+    <audio id="sound-drum" src="https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3"></audio>
+    <audio id="sound-cymbal" src="https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3"></audio>
+
+    <script>
+        // --- あなたのFirebase Config ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAlSbtHvI4Xsv-WvYkVbgGZpeVqMFSiqfA",
+            authDomain: "roulette-c21b9.firebaseapp.com",
+            projectId: "roulette-c21b9",
+            storageBucket: "roulette-c21b9.firebasestorage.app",
+            messagingSenderId: "1037733313679",
+            appId: "1:1037733313679:web:bc5a94119503c1231f84fa",
+            measurementId: "G-Z3ZBMP2CMV",
+            databaseURL: "https://roulette-c21b9-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+
+        // Firebase初期化
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const saunaRef = db.ref('sauna_list');
+
+        let items = [];
+        let rotation = 0;
+        let isSpinning = false;
+        const colors = ['#FF6B6B', '#4D96FF', '#FFD93D', '#6BCB77', '#9575CD', '#FFA447', '#4DB6AC'];
+
+        // 1. データのリアルタイム受信
+        saunaRef.on('value', (snapshot) => {
+            // データが届いた時点で、まずは即座にONLINEにする（フリーズ防止）
+            document.getElementById('status').innerText = "✅ ONLINE";
+            document.getElementById('status').className = "inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-green-500 text-white uppercase";
+
+            try {
+                const data = snapshot.val();
+                items = [];
+                if (data) {
+                    Object.keys(data).forEach(key => {
+                        const itemData = data[key];
+                        if (!itemData) return;
+
+                        let w = 1;
+                        if (itemData.weight !== undefined && itemData.weight !== null) {
+                            w = parseInt(itemData.weight, 10);
+                        }
+                        if (isNaN(w) || w < 1) w = 1;
+
+                        let wc = 0;
+                        if (itemData.win_count !== undefined && itemData.win_count !== null) {
+                            wc = parseInt(itemData.win_count, 10);
+                        }
+                        if (isNaN(wc)) wc = 0;
+
+                        items.push({
+                            id: key,
+                            user_name: itemData.user_name || '不明',
+                            location_name: itemData.location_name || '未設定',
+                            win_count: wc,
+                            weight: w
+                        });
+                    });
+                }
+                updateUI();
+                drawWheel();
+            } catch (error) {
+                console.error("Firebaseデータ処理エラー:", error);
+            }
+        }, (error) => {
+            // Firebase自体への接続に失敗した場合
+            console.error("Firebase接続エラー:", error);
+            document.getElementById('status').innerText = "❌ ERROR";
+            document.getElementById('status').className = "inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-red-500 text-white uppercase";
+        });
+
+        // 2. データの投稿
+        function addSauna() {
+            const user = document.getElementById('userName').value;
+            const loc = document.getElementById('locName').value;
+
+            if (!user || !loc) return alert('名前と施設名を入力してください');
+
+            saunaRef.push({
+                user_name: user,
+                location_name: loc,
+                win_count: 0,
+                weight: 1
+            });
+            document.getElementById('locName').value = '';
+        }
+
+        // 3. 比率のリアルタイム変更（安全な引数処理に修正）
+        function changeWeight(id, currentWeight, delta) {
+            let newWeight = parseInt(currentWeight, 10) + parseInt(delta, 10);
+            if (isNaN(newWeight) || newWeight < 1) newWeight = 1;
+            if (newWeight > 10) newWeight = 10;
+
+            saunaRef.child(id).update({ weight: newWeight });
+        }
+
+        // 4. 項目の削除
+        function removeItem(id) {
+            if (confirm('この項目をリストから消しますか？')) {
+                saunaRef.child(id).remove()
+                    .then(() => { console.log("削除成功"); })
+                    .catch((error) => { alert("削除に失敗しました: " + error.message); });
+            }
+        }
+
+        // 5. 当選回数の更新
+        function updateWin(item) {
