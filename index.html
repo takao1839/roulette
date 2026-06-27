@@ -54,4 +54,209 @@
                 <div class="relative w-[300px] h-[300px] md:w-[380px] md:h-[380px]">
                     <div class="absolute top-[-15px] left-1/2 -translate-x-1/2 z-20 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[30px] border-t-red-500 shadow-md"></div>
                     <canvas id="wheel" width="400" height="400" class="w-full h-full rounded-full bg-white shadow-2xl"></canvas>
-                    <button onclick="spin()" id="spinBtn" class="absolute top-1/2 left-1/2 -
+                    <button onclick="spin()" id="spinBtn" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-yellow-400 hover:bg-yellow-500 border-4 border-white rounded-full font-bold text-blue-900 shadow-lg z-30 transition transform active:scale-90">
+                        GO!
+                    </button>
+                </div>
+                <div id="statusMsg" class="mt-8 text-xl font-bold text-blue-800 text-center min-h-[3em] bg-white p-5 rounded-2xl shadow-sm w-full border-2 border-blue-50"></div>
+            </div>
+        </div>
+    </div>
+
+    <audio id="sound-drum" src="https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3"></audio>
+    <audio id="sound-cymbal" src="https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3"></audio>
+
+    <script>
+        // --- あなたのFirebase Config ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAlSbtHvI4Xsv-WvYkVbgGZpeVqMFSiqfA",
+            authDomain: "roulette-c21b9.firebaseapp.com",
+            projectId: "roulette-c21b9",
+            storageBucket: "roulette-c21b9.firebasestorage.app",
+            messagingSenderId: "1037733313679",
+            appId: "1:1037733313679:web:bc5a94119503c1231f84fa",
+            measurementId: "G-Z3ZBMP2CMV",
+            databaseURL: "https://roulette-c21b9-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+
+        // Firebase初期化
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const saunaRef = db.ref('sauna_list');
+
+        let items = [];
+        let rotation = 0;
+        let isSpinning = false;
+        const colors = ['#FF6B6B', '#4D96FF', '#FFD93D', '#6BCB77', '#9575CD', '#FFA447', '#4DB6AC'];
+
+        // 1. データのリアルタイム受信
+        saunaRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            items = [];
+            if (data) {
+                Object.keys(data).forEach(key => {
+                    // 古いデータ（weightがないデータ）はデフォルトで1にする
+                    const itemData = data[key];
+                    const weight = itemData.weight !== undefined ? Number(itemData.weight) : 1;
+                    items.push({ id: key, ...itemData, weight: weight });
+                });
+            }
+            document.getElementById('status').innerText = "✅ ONLINE";
+            document.getElementById('status').className = "inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-green-500 text-white uppercase";
+            updateUI();
+            drawWheel();
+        });
+
+        // 2. データの投稿
+        function addSauna() {
+            const user = document.getElementById('userName').value;
+            const loc = document.getElementById('locName').value;
+            const weight = parseInt(document.getElementById('weight').value) || 1;
+            if (!user || !loc) return alert('名前と施設名を入力してください');
+
+            saunaRef.push({
+                user_name: user,
+                location_name: loc,
+                win_count: 0,
+                weight: weight // データベースに重みを保存
+            });
+            document.getElementById('locName').value = '';
+            document.getElementById('weight').value = '1'; // 初期値に戻す
+        }
+
+        // 3. 項目の削除
+        function removeItem(id) {
+            if (confirm('この項目をリストから消しますか？')) {
+                saunaRef.child(id).remove()
+                    .then(() => { console.log("削除成功"); })
+                    .catch((error) => { alert("削除に失敗しました: " + error.message); });
+            }
+        }
+
+        // 4. 当選回数の更新
+        function updateWin(item) {
+            saunaRef.child(item.id).update({ win_count: item.win_count });
+        }
+
+        // 5. 全消去
+        function resetAll() {
+            if (confirm('全てのデータをリセットしますか？')) saunaRef.remove();
+        }
+
+        function updateUI() {
+            const list = document.getElementById('locationList');
+            if (items.length === 0) {
+                list.innerHTML = "<li class='text-gray-400 italic text-sm py-4'>候補がありません</li>";
+                return;
+            }
+            list.innerHTML = items.map(item => `
+                <li class="flex justify-between items-center p-3 bg-blue-50 rounded-2xl border-2 ${item.win_count >= 3 ? 'border-yellow-400 bg-yellow-50' : 'border-white'}">
+                    <div class="flex-1">
+                        <div class="text-sm font-bold text-gray-800">${item.location_name} <span class="text-xs text-blue-500 bg-blue-100 px-2 py-0.5 rounded-full ml-1">×${item.weight}</span></div>
+                        <div class="text-[10px] text-blue-400 font-bold">By ${item.user_name}</div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="text-blue-500 font-mono text-lg tracking-tighter">
+                            ${'●'.repeat(item.win_count)}${'○'.repeat(Math.max(0, 3 - item.win_count))}
+                        </div>
+                        <button onclick="removeItem(\`${item.id}\`)" class="text-red-300 hover:text-red-500 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </div>
+                </li>
+            `).join('');
+            if (items.length < 2) document.getElementById('statusMsg').innerText = "2つ以上追加してね";
+        }
+
+        // 6. 円盤の描画（比率対応版）
+        function drawWheel() {
+            const canvas = document.getElementById('wheel');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, 400, 400);
+
+            if (items.length === 0) {
+                // 待機中の描画
+                ctx.fillStyle = colors[0];
+                ctx.beginPath(); ctx.moveTo(200, 200); ctx.arc(200, 200, 200, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = 'white'; ctx.font = 'bold 16px Zen Maru Gothic'; ctx.textAlign = 'center';
+                ctx.fillText('待機中', 200, 205);
+                return;
+            }
+
+            const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
+            let currentAngle = 0;
+
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                const portion = item.weight / totalWeight;
+                const arc = portion * (Math.PI * 2);
+
+                // 扇形を描画
+                ctx.fillStyle = colors[i % colors.length];
+                ctx.beginPath();
+                ctx.moveTo(200, 200);
+                ctx.arc(200, 200, 200, currentAngle, currentAngle + arc);
+                ctx.fill();
+
+                // テキストを描画
+                ctx.save();
+                ctx.translate(200, 200);
+                ctx.rotate(currentAngle + arc / 2);
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 14px Zen Maru Gothic';
+                ctx.textAlign = 'right';
+                ctx.fillText(item.location_name.slice(0, 10), 180, 5);
+                ctx.restore();
+
+                currentAngle += arc;
+            }
+        }
+
+        // 7. ルーレットを回す（比率対応版の判定アルゴリズム）
+        function spin() {
+            if (isSpinning || items.length < 2) return alert('サウナを2つ以上入れてね');
+            isSpinning = true;
+            document.getElementById('sound-drum').play();
+            
+            const spinDeg = 3600 + Math.random() * 360;
+            rotation += spinDeg;
+            document.getElementById('wheel').style.transform = `rotate(${rotation}deg)`;
+            
+            setTimeout(() => {
+                isSpinning = false;
+                document.getElementById('sound-cymbal').play();
+                
+                // 停止した角度（0〜360度）を計算。最上部(12時方向)の針の指す角度を導出
+                const stopAngleDeg = (360 - (rotation % 360) + 270) % 360;
+                const stopAngleRad = (stopAngleDeg * Math.PI) / 180;
+
+                const totalWeight = items.reduce((sum, item) => sum + item.weight, 0);
+                let currentAngleRad = 0;
+                let winner = items[0];
+
+                // 蓄積角度から当選施設を割り出す
+                for (let i = 0; i < items.length; i++) {
+                    const arc = (items[i].weight / totalWeight) * (Math.PI * 2);
+                    if (stopAngleRad >= currentAngleRad && stopAngleRad < currentAngleRad + arc) {
+                        winner = items[i];
+                        break;
+                    }
+                    currentAngleRad += arc;
+                }
+
+                winner.win_count++;
+                updateWin(winner);
+
+                if (winner.win_count >= 3) {
+                    document.getElementById('statusMsg').innerHTML = `🎊 決定！！ 🎊<br>${winner.location_name}`;
+                    confetti({ particleCount: 150, spread: 70 });
+                } else {
+                    document.getElementById('statusMsg').innerHTML = `${winner.location_name} 当選！<br><span class="text-sm font-normal">あと ${3 - winner.win_count} 回</span>`;
+                }
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
