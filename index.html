@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>サウナルーレット</title>
+    <title>サウナルーレット (割合調整版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -29,11 +29,6 @@
                     <div class="flex flex-col gap-3">
                         <input type="text" id="userName" placeholder="あなたの名前" class="border-2 border-blue-50 p-3 rounded-xl outline-none focus:border-blue-400">
                         <input type="text" id="locName" placeholder="サウナ施設名" class="border-2 border-blue-50 p-3 rounded-xl outline-none focus:border-blue-400">
-                        <div class="flex items-center gap-2">
-                            <span class="text-sm font-bold text-gray-600 shrink-0">当たる割合:</span>
-                            <input type="number" id="locWeight" value="1" min="1" max="10" class="border-2 border-blue-50 p-2 rounded-xl outline-none focus:border-blue-400 w-20 text-center font-bold">
-                            <span class="text-xs text-gray-400">※数字が大きいほど当たりやすい</span>
-                        </div>
                         <button onclick="addSauna()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg transition active:scale-95">
                             リストに追加
                         </button>
@@ -42,7 +37,7 @@
 
                 <div>
                     <div class="flex justify-between items-end mb-4">
-                        <h2 class="text-lg font-bold text-blue-900 italic">📊 候補リスト</h2>
+                        <h2 class="text-lg font-bold text-blue-900 italic">📊 候補リストと割合調整</h2>
                         <button onclick="resetAll()" class="text-[10px] text-red-300 hover:text-red-500 font-bold uppercase">All Reset</button>
                     </div>
                     <ul id="locationList" class="space-y-2 max-h-80 overflow-y-auto">
@@ -64,141 +59,4 @@
     </div>
 
     <audio id="sound-drum" src="https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3"></audio>
-    <audio id="sound-cymbal" src="https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3"></audio>
-
-    <script>
-        // --- あなたのFirebase Config ---
-        const firebaseConfig = {
-            apiKey: "AIzaSyAlSbtHvI4Xsv-WvYkVbgGZpeVqMFSiqfA",
-            authDomain: "roulette-c21b9.firebaseapp.com",
-            projectId: "roulette-c21b9",
-            storageBucket: "roulette-c21b9.firebasestorage.app",
-            messagingSenderId: "1037733313679",
-            appId: "1:1037733313679:web:bc5a94119503c1231f84fa",
-            measurementId: "G-Z3ZBMP2CMV",
-            databaseURL: "https://roulette-c21b9-default-rtdb.asia-southeast1.firebasedatabase.app"
-        };
-
-        // Firebase初期化
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-        const saunaRef = db.ref('sauna_list');
-
-        let items = [];
-        let rotation = 0;
-        let isSpinning = false;
-        const colors = ['#FF6B6B', '#4D96FF', '#FFD93D', '#6BCB77', '#9575CD', '#FFA447', '#4DB6AC'];
-
-        // 1. データのリアルタイム受信
-        saunaRef.on('value', (snapshot) => {
-            const data = snapshot.val();
-            items = [];
-            if (data) {
-                Object.keys(data).forEach(key => {
-                    items.push({ id: key, ...data[key] });
-                });
-            }
-            document.getElementById('status').innerText = "✅ ONLINE";
-            document.getElementById('status').className = "inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-green-500 text-white uppercase";
-            updateUI();
-            drawWheel();
-        });
-
-        // 2. データの投稿
-        function addSauna() {
-            const user = document.getElementById('userName').value;
-            const loc = document.getElementById('locName').value;
-            const weight = parseInt(document.getElementById('locWeight').value) || 1;
-            if (!user || !loc) return alert('名前と施設名を入力してください');
-
-            saunaRef.push({
-                user_name: user,
-                location_name: loc,
-                win_count: 0,
-                weight: weight  // 割合を保存
-            });
-            document.getElementById('locName').value = '';
-            document.getElementById('locWeight').value = '1';
-        }
-
-        // 3. 項目の削除
-        function removeItem(id) {
-            if (confirm('この項目をリストから消しますか？')) {
-                saunaRef.child(id).remove()
-                    .then(() => console.log("削除成功"))
-                    .catch((error) => alert("削除に失敗しました: " + error.message));
-            }
-        }
-
-        // 4. 当選回数の更新
-        function updateWin(item) {
-            saunaRef.child(item.id).update({ win_count: item.win_count });
-        }
-
-        // 5. 全消去
-        function resetAll() {
-            if (confirm('全てのデータをリセットしますか？')) saunaRef.remove();
-        }
-
-        function updateUI() {
-            const list = document.getElementById('locationList');
-            if (items.length === 0) {
-                list.innerHTML = "<li class='text-gray-400 italic text-sm py-4'>候補がありません</li>";
-                return;
-            }
-            list.innerHTML = items.map(item => `
-                <li class="flex justify-between items-center p-3 bg-blue-50 rounded-2xl border-2 ${item.win_count >= 3 ? 'border-yellow-400 bg-yellow-50' : 'border-white'}">
-                    <div class="flex-1">
-                        <div class="text-sm font-bold text-gray-800">${item.location_name} <span class="text-xs text-blue-500 font-normal">(比率:${item.weight || 1})</span></div>
-                        <div class="text-[10px] text-blue-400 font-bold">By ${item.user_name}</div>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <div class="text-blue-500 font-mono text-lg tracking-tighter">
-                            ${'●'.repeat(item.win_count)}${'○'.repeat(Math.max(0, 3 - item.win_count))}
-                        </div>
-                        <button onclick="removeItem(\`${item.id}\`)" class="text-red-300 hover:text-red-500 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                        </button>
-                    </div>
-                </li>
-            `).join('');
-            if (items.length < 2) document.getElementById('statusMsg').innerText = "2つ以上追加してね";
-        }
-
-        // 割合を考慮してルーレットを描画
-        function drawWheel() {
-            const canvas = document.getElementById('wheel');
-            const ctx = canvas.getContext('2d');
-            ctx.clearRect(0, 0, 400, 400);
-
-            if (items.length === 0) {
-                ctx.fillStyle = colors[0];
-                ctx.beginPath(); ctx.moveTo(200, 200); ctx.arc(200, 200, 200, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = 'white'; ctx.font = 'bold 16px Zen Maru Gothic'; ctx.textAlign = 'center';
-                ctx.fillText('待機中', 200, 205);
-                return;
-            }
-
-            const totalWeight = items.reduce((sum, item) => sum + (item.weight || 1), 0);
-            let currentAngle = 0;
-
-            for (let i = 0; i < items.length; i++) {
-                const item = items[i];
-                const weight = item.weight || 1;
-                const arc = (Math.PI * 2) * (weight / totalWeight);
-
-                ctx.fillStyle = colors[i % colors.length];
-                ctx.beginPath(); 
-                ctx.moveTo(200, 200); 
-                ctx.arc(200, 200, 200, currentAngle, currentAngle + arc); 
-                ctx.fill();
-
-                // 文字の描画
-                ctx.save(); 
-                ctx.translate(200, 200); 
-                ctx.rotate(currentAngle + arc / 2);
-                ctx.fillStyle = 'white'; 
-                ctx.font = 'bold 16px Zen Maru Gothic'; 
-                ctx.textAlign =
+    <audio id="sound-cymbal" src="https://
