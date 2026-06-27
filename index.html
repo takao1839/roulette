@@ -25,37 +25,10 @@
         <div class="grid md:grid-cols-2 gap-8 items-start">
             <div class="bg-white p-6 rounded-3xl shadow-xl border-t-8 border-blue-400">
                 <div class="mb-6 border-b border-dashed pb-6">
-                    <h2 id="formTitle" class="text-xl mb-4 font-bold text-blue-800">✍️ 施設を追加</h2>
+                    <h2 class="text-xl mb-4 font-bold text-blue-800">✍️ 施設を追加</h2>
                     <div class="flex flex-col gap-3">
                         <input type="text" id="userName" placeholder="あなたの名前" class="border-2 border-blue-50 p-3 rounded-xl outline-none focus:border-blue-400">
                         <input type="text" id="locName" placeholder="サウナ施設名" class="border-2 border-blue-50 p-3 rounded-xl outline-none focus:border-blue-400">
                         <div class="flex items-center gap-2 bg-blue-50/50 p-2 rounded-xl border border-blue-100">
-                            <label for="weight" class="text-sm font-bold text-blue-700 whitespace-nowrap px-2">当選割合 (重み):</label>
-                            <input type="number" id="weight" value="1" min="1" max="10" class="w-20 border-2 border-blue-100 p-2 rounded-lg text-center font-bold outline-none focus:border-blue-400">
-                        </div>
-                        <div class="flex gap-2">
-                            <button id="submitBtn" onclick="addSauna()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg transition active:scale-95">
-                                リストに追加
-                            </button>
-                            <button id="cancelEditBtn" onclick="cancelEdit()" class="hidden bg-gray-400 hover:bg-gray-500 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition active:scale-95">
-                                取消
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <div>
-                    <div class="flex justify-between items-end mb-4">
-                        <h2 class="text-lg font-bold text-blue-900 italic">📊 候補リスト</h2>
-                        <button onclick="resetAll()" class="text-[10px] text-red-300 hover:text-red-500 font-bold uppercase">All Reset</button>
-                    </div>
-                    <ul id="locationList" class="space-y-2 max-h-80 overflow-y-auto">
-                        </ul>
-                </div>
-            </div>
-
-            <div class="flex flex-col items-center">
-                <div class="relative w-[300px] h-[300px] md:w-[380px] md:h-[380px]">
-                    <div class="absolute top-[-15px] left-1/2 -translate-x-1/2 z-20 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[30px] border-t-red-500 shadow-md"></div>
-                    <canvas id="wheel" width="400" height="400" class="w-full h-full rounded-full bg-white shadow-2xl"></canvas>
-                    <button onclick="spin()" id="spinBtn" class="absolute top-1/2
+                            <label for="weight" class="text-xs font-bold text-blue-700 whitespace-nowrap pl-2">当たる割合 (重み):</label>
+                            <input type="number" id="weight" value="1" min="1" max="10" class="w-full border-2 border-blue-100 p-2
