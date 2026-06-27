@@ -3,72 +3,79 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>サウナ・ルーレット PRO</title>
+    <title>共有サウナ・ルーレット</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <!-- Supabaseライブラリ -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@700&display=swap');
         body { font-family: 'Zen Maru Gothic', sans-serif; background-color: #e0f2fe; }
-        .wheel-shadow { box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
         #wheel { transition: transform 5s cubic-bezier(0.15, 0, 0.15, 1); }
-        .winner-anim { animation: pulse 0.5s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        .dot { font-size: 1.2rem; }
     </style>
 </head>
 <body class="p-4 md:p-8">
 
     <div class="max-w-4xl mx-auto">
         <header class="text-center mb-8">
-            <h1 class="text-4xl font-bold text-blue-600 mb-2">🧖‍♂️ サウナ施設決定ルーレット 🧖‍♀️</h1>
-            <p class="text-gray-600">3回当選で本日のサウナが決定！</p>
+            <h1 class="text-4xl font-bold text-blue-600 mb-2">🧖‍♂️ 共有サウナルーレット 🧖‍♀️</h1>
+            <p class="text-gray-600 small">みんなで投稿！3回当たったらそこに行く！</p>
         </header>
 
         <div class="grid md:grid-cols-2 gap-8 items-start">
-            
-            <!-- 左側：入力とリスト -->
-            <div class="bg-white p-6 rounded-2xl shadow-lg">
-                <div class="mb-6">
-                    <h2 class="text-xl mb-4 flex items-center font-bold">✍️ 候補を投稿する</h2>
+            <!-- 左側：投稿とリスト -->
+            <div class="bg-white p-6 rounded-2xl shadow-lg border-t-4 border-blue-400">
+                <div class="mb-6 border-b pb-4">
+                    <h2 class="text-xl mb-4 font-bold flex items-center">✍️ 候補を投稿</h2>
                     <div class="flex flex-col gap-2">
-                        <input type="text" id="userName" placeholder="あなたの名前" class="border-2 border-gray-200 p-2 rounded-lg focus:border-blue-400 outline-none">
-                        <input type="text" id="locName" placeholder="サウナ施設名" class="border-2 border-gray-200 p-2 rounded-lg focus:border-blue-400 outline-none">
-                        <button onclick="addLocation()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded-lg transition">追加する</button>
+                        <input type="text" id="userName" placeholder="名前" class="border p-2 rounded focus:ring-2 focus:ring-blue-300 outline-none">
+                        <input type="text" id="locName" placeholder="サウナ施設名" class="border p-2 rounded focus:ring-2 focus:ring-blue-300 outline-none">
+                        <button onclick="addLocation()" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 rounded transition">投稿して保存！</button>
                     </div>
                 </div>
 
                 <div>
-                    <h2 class="text-xl mb-4 font-bold border-b pb-2">📊 当選状況 (3回で決定)</h2>
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-bold">📊 現在の状況</h2>
+                        <button onclick="resetAll()" class="text-xs text-red-400 hover:underline">リセット</button>
+                    </div>
                     <ul id="locationList" class="space-y-2">
-                        <!-- ここにリストが追加される -->
+                        <p class="text-gray-400 text-sm">読み込み中...</p>
                     </ul>
                 </div>
             </div>
 
             <!-- 右側：ルーレット本体 -->
             <div class="flex flex-col items-center">
-                <div class="relative w-[320px] h-[320px] md:w-[400px] md:h-[400px]">
+                <div class="relative w-[320px] h-[320px] md:w-[380px] md:h-[380px]">
                     <!-- 針 -->
-                    <div class="absolute top-[-20px] left-1/2 -translate-x-1/2 z-20 w-0 h-0 border-l-[20px] border-l-transparent border-r-[20px] border-r-transparent border-t-[40px] border-t-red-500"></div>
+                    <div class="absolute top-[-20px] left-1/2 -translate-x-1/2 z-20 w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[30px] border-t-red-500"></div>
                     
-                    <canvas id="wheel" width="400" height="400" class="w-full h-full rounded-full wheel-shadow bg-white"></canvas>
+                    <canvas id="wheel" width="400" height="400" class="w-full h-full rounded-full bg-white shadow-2xl"></canvas>
                     
-                    <button id="spinBtn" onclick="spin()" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 bg-yellow-400 hover:bg-yellow-500 border-4 border-white rounded-full font-bold text-lg shadow-lg z-30">
+                    <button id="spinBtn" onclick="spin()" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 bg-yellow-400 hover:bg-yellow-500 border-4 border-white rounded-full font-bold shadow-lg z-30 transition transform active:scale-95 text-blue-800">
                         GO!
                     </button>
                 </div>
                 
-                <div id="statusMsg" class="mt-8 text-2xl font-bold text-center text-blue-800 min-h-[1.5em]">
-                    施設を追加してスタート！
+                <div id="statusMsg" class="mt-8 text-xl font-bold text-blue-800 text-center min-h-[3em] bg-white p-4 rounded-xl shadow-sm w-full border border-blue-100">
+                    読み込み中...
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- オーディオ要素 -->
+    <!-- 効果音 -->
     <audio id="sound-drum" src="https://assets.mixkit.co/active_storage/sfx/2013/2013-preview.mp3"></audio>
     <audio id="sound-cymbal" src="https://assets.mixkit.co/active_storage/sfx/2017/2017-preview.mp3"></audio>
 
     <script>
+        // --- Supabase設定 ---
+        const SUPABASE_URL = 'https://ajrrcgocmfnwzoskxups.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFqcnJjZ29jbWZud3pvc2t4dXBzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDg1NjUsImV4cCI6MjA5ODA4NDU2NX0.UbFxhyLoXCYnopPfVMdQLBfL-Ob0P5LBPK4v97a-y48';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
         let items = [];
         let rotation = 0;
         let isSpinning = false;
@@ -78,36 +85,76 @@
         const ctx = canvas.getContext('2d');
         const statusMsg = document.getElementById('statusMsg');
 
-        function addLocation() {
-            const userName = document.getElementById('userName').value;
-            const locName = document.getElementById('locName').value;
+        // 1. データの読み込み
+        async function loadData() {
+            const { data, error } = await supabase
+                .from('sauna_list')
+                .select('*')
+                .order('created_at', { ascending: true });
 
-            if (!userName || !locName) return alert('名前と施設名を入力してください！');
+            if (error) {
+                console.error(error);
+                statusMsg.innerText = "エラー: Supabaseのテーブルが未作成かもしれません";
+            } else {
+                items = data.map(d => ({
+                    id: d.id,
+                    name: d.user_name,
+                    location: d.location_name,
+                    count: d.win_count
+                }));
+                statusMsg.innerText = items.length < 2 ? "あと" + (2 - items.length) + "つ以上追加してね！" : "準備完了！";
+                updateUI();
+                drawWheel();
+            }
+        }
 
-            items.push({
-                name: userName,
-                location: locName,
-                count: 0,
-                id: Date.now()
-            });
+        // 2. データの投稿
+        async function addLocation() {
+            const user = document.getElementById('userName').value;
+            const loc = document.getElementById('locName').value;
+            if (!user || !loc) return alert('名前と施設名を入れてね！');
 
+            const { error } = await supabase
+                .from('sauna_list')
+                .insert([{ user_name: user, location_name: loc, win_count: 0 }]);
+
+            if (error) alert('保存に失敗しました');
             document.getElementById('locName').value = '';
-            updateUI();
-            drawWheel();
+            loadData(); 
+        }
+
+        // 3. 当選回数の保存
+        async function saveWinCount(item) {
+            await supabase
+                .from('sauna_list')
+                .update({ win_count: item.count })
+                .eq('id', item.id);
+        }
+
+        // 4. データのリセット
+        async function resetAll() {
+            if (!confirm('全員の投稿と当選回数をリセットしますか？')) return;
+            const { error } = await supabase
+                .from('sauna_list')
+                .delete()
+                .neq('id', 0);
+            loadData();
         }
 
         function updateUI() {
             const list = document.getElementById('locationList');
+            if (items.length === 0) {
+                list.innerHTML = '<p class="text-gray-400 text-sm italic">候補がありません</p>';
+                return;
+            }
             list.innerHTML = items.map(item => `
-                <li class="flex justify-between items-center p-3 bg-gray-50 rounded-lg ${item.count >= 3 ? 'bg-yellow-100 border-2 border-yellow-400 winner-anim' : ''}">
+                <li class="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100 ${item.count >= 3 ? 'bg-yellow-100 border-yellow-400 font-bold' : ''}">
                     <div>
-                        <span class="font-bold text-lg">${item.location}</span>
-                        <span class="text-xs text-gray-500 block">投稿者: ${item.name}さん</span>
+                        <div class="text-sm font-bold text-gray-800">${item.location}</div>
+                        <div class="text-[10px] text-gray-400">投稿: ${item.name}さん</div>
                     </div>
-                    <div class="flex gap-1">
-                        ${Array(3).fill(0).map((_, i) => `
-                            <div class="w-6 h-6 rounded-full border-2 ${i < item.count ? 'bg-red-500 border-red-500' : 'bg-white border-gray-300'}"></div>
-                        `).join('')}
+                    <div class="text-blue-500 font-mono dot">
+                        ${'●'.repeat(item.count)}${'○'.repeat(Math.max(0, 3-item.count))}
                     </div>
                 </li>
             `).join('');
@@ -116,7 +163,6 @@
         function drawWheel() {
             const num = items.length || 1;
             const arc = (Math.PI * 2) / num;
-
             ctx.clearRect(0, 0, 400, 400);
 
             for (let i = 0; i < num; i++) {
@@ -126,66 +172,60 @@
                 ctx.moveTo(200, 200);
                 ctx.arc(200, 200, 200, angle, angle + arc);
                 ctx.fill();
-                ctx.strokeStyle = 'white';
+                ctx.strokeStyle = 'rgba(255,255,255,0.5)';
                 ctx.lineWidth = 2;
                 ctx.stroke();
 
-                // テキスト
                 ctx.save();
                 ctx.translate(200, 200);
                 ctx.rotate(angle + arc / 2);
                 ctx.textAlign = 'right';
                 ctx.fillStyle = 'white';
-                ctx.font = 'bold 16px Zen Maru Gothic';
-                const text = items[i] ? items[i].location : '施設を追加';
-                ctx.fillText(text.substring(0, 10), 180, 8);
+                ctx.font = 'bold 16px sans-serif';
+                const text = items[i] ? items[i].location : 'サウナを追加';
+                ctx.fillText(text.slice(0, 10), 180, 8);
                 ctx.restore();
             }
         }
 
         function spin() {
-            if (isSpinning || items.length < 2) {
-                if (items.length < 2) alert('候補を2つ以上追加してください！');
-                return;
-            }
-
+            if (isSpinning || items.length < 2) return;
             isSpinning = true;
+            
             const drum = document.getElementById('sound-drum');
             drum.currentTime = 0;
             drum.play();
 
-            statusMsg.innerText = "何が出るかな...？";
-            
-            const spinAngle = 360 * 5 + Math.random() * 360;
-            rotation += spinAngle;
+            const spinDeg = 3600 + Math.random() * 360;
+            rotation += spinDeg;
             canvas.style.transform = `rotate(${rotation}deg)`;
 
-            setTimeout(() => {
+            statusMsg.innerText = "抽選中...♨️";
+
+            setTimeout(async () => {
                 isSpinning = false;
                 document.getElementById('sound-cymbal').play();
                 
-                // 当選判定
                 const actualDeg = rotation % 360;
                 const slice = 360 / items.length;
                 const index = Math.floor(((360 - actualDeg + 270) % 360) / slice);
                 const winner = items[index];
 
                 winner.count++;
-                
-                if (winner.count >= 3) {
-                    statusMsg.innerHTML = `✨ 決定！！ ✨<br>${winner.location}`;
-                    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
-                    document.getElementById('spinBtn').disabled = true;
-                    document.getElementById('spinBtn').classList.add('opacity-50');
-                } else {
-                    statusMsg.innerHTML = `当選：${winner.location}<br><span class="text-sm font-normal">(${winner.name}さんの投稿・${winner.count}回目)</span>`;
-                }
+                await saveWinCount(winner);
 
+                if (winner.count >= 3) {
+                    statusMsg.innerHTML = `✨ 決定！！ ✨<br><span class="text-2xl">${winner.location}</span>`;
+                    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+                } else {
+                    statusMsg.innerHTML = `当選：${winner.location}<br><span class="text-sm font-normal">あと ${3 - winner.count} 回当選で決定！</span>`;
+                }
                 updateUI();
             }, 5000);
         }
 
-        drawWheel();
+        // 初回読み込み
+        window.onload = loadData;
     </script>
 </body>
 </html>
